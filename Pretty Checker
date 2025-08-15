@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Server Status</title>
+  <title>Server Status v2</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,6 +18,8 @@
     ::-webkit-scrollbar-thumb { background: #374151; border-radius: 8px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
     .badge { @apply text-xs px-2 py-1 rounded-full font-medium; }
+    .spinner { border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #4f46e5; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin:auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
@@ -25,10 +27,10 @@
     <!-- Header -->
     <header class="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
       <div class="flex items-center gap-3">
-        <img src="https://media.discordapp.net/attachments/1383825842072977452/1405193354563817543/New_Project.png?ex=689defca&is=689c9e4a&hm=55f84afb213155cf1013c2a15c97d2d63133d13e65af6068cfe2ce8059931736&=&format=webp&quality=lossless" alt="MC" class="w-10 h-10">
+        <img src="https://media.discordapp.net/attachments/1383825842072977452/1405193354563817543/New_Project.png" alt="MC" class="w-10 h-10">
         <div>
           <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">bAlE</h1>
-          <p class="text-slate-400 text-sm">Pretty Checker </p>
+          <p class="text-slate-400 text-sm">Pretty Checker v2</p>
         </div>
       </div>
       <div class="flex items-center gap-2 text-xs text-slate-400">
@@ -56,13 +58,18 @@
         <span>Examples:</span>
         <button class="example badge bg-slate-800 hover:bg-slate-700" data-host="play.isekainetwork.fun">play.isekainetwork.fun</button>
         <button class="example badge bg-slate-800 hover:bg-slate-700" data-host="np.everestrealms.fun">np.everestrealms.fun</button>
-        <button class="example badge bg-slate-800 hover:bg-slate-700" data-host="play.minecraftnepal.com" >play.minecraftnepal.com</button>
+        <button class="example badge bg-slate-800 hover:bg-slate-700" data-host="play.minecraftnepal.com">play.minecraftnepal.com</button>
         <button class="example badge bg-slate-800 hover:bg-slate-700" data-host="play.craftnepal.net">play.craftnepal.net</button>
         <label class="inline-flex items-center gap-2 ml-auto text-slate-400">
           <input id="autoRefresh" type="checkbox" class="w-4 h-4 rounded bg-slate-900 border-white/10"> Auto-refresh (30s)
         </label>
       </div>
     </section>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="hidden mt-6 text-center">
+      <div class="spinner"></div>
+    </div>
 
     <!-- Results -->
     <section id="result" class="mt-6 hidden">
@@ -140,8 +147,14 @@
               <dd id="playersList" class="font-medium text-right truncate">—</dd>
             </div>
           </dl>
-          <p class="mt-4 text-xs text-slate-500">Some Features Not Wokring </p>
+          <p class="mt-4 text-xs text-slate-500">Some features may not work.</p>
         </div>
+      </div>
+
+      <!-- Suggestions -->
+      <div id="suggestions" class="mt-6 glass rounded-2xl border border-white/10 shadow-xl p-5 hidden">
+        <h3 class="font-semibold text-lg mb-3">Suggestions</h3>
+        <ul id="suggestionList" class="list-disc list-inside text-sm text-slate-300"></ul>
       </div>
     </section>
 
@@ -158,6 +171,9 @@
     const checkBtn = $('checkBtn');
     const copyBtn = $('copyBtn');
     const result = $('result');
+    const loading = $('loading');
+    const suggestionsContainer = $('suggestions');
+    const suggestionList = $('suggestionList');
 
     const ui = {
       icon: $('icon'), serverName: $('serverName'), onlineBadge: $('onlineBadge'), edition: $('edition'),
@@ -190,96 +206,105 @@
     function fmtDate(d){ return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(d); }
 
     function renderMotd(lines) {
-      if (!lines || !Array.isArray(lines)) return '';
-      const colorMap = { '0':'#000000','1':'#0000AA','2':'#00AA00','3':'#00AAAA','4':'#AA0000','5':'#AA00AA','6':'#FFAA00','7':'#AAAAAA','8':'#555555','9':'#5555FF','a':'#55FF55','b':'#55FFFF','c':'#FF5555','d':'#FF55FF','e':'#FFFF55','f':'#FFFFFF' };
-      const fmtMap = { 'l':'font-weight:bold', 'o':'font-style:italic', 'n':'text-decoration:underline', 'm':'text-decoration:line-through' };
-      const reset = () => ({ color:'#FFFFFF', styles:new Set() });
-      const span = (text, s) => `<span style="color:${s.color};${Array.from(s.styles).join(';')}">${text}</span>`;
-      let state = reset();
-      let out = '';
-      for (let i=0;i<lines.length;i++){
-        const line = lines[i]; let buf='';
-        for (let j=0;j<line.length;j++){
-          if (line[j]==='§' && j+1<line.length){ if(buf){ out+=span(buf,state); buf=''; } const code=line[j+1].toLowerCase(); if(colorMap[code]){state.color=colorMap[code];state.styles.clear();} else if(code==='r'){state=reset();} else if(fmtMap[code]){state.styles.add(fmtMap[code]);} j++; } else { buf+=line[j]; }
-        }
-        if(buf) out+=span(buf,state); if(i<lines.length-1) out+='<br>';
+      if (!lines) return '';
+      const colorMap = {
+        '0':'#000000','1':'#0000AA','2':'#00AA00','3':'#00AAAA','4':'#AA0000',
+        '5':'#AA00AA','6':'#FFAA00','7':'#AAAAAA','8':'#555555','9':'#5555FF',
+        'a':'#55FF55','b':'#55FFFF','c':'#FF5555','d':'#FF55FF','e':'#FFFF55','f':'#FFFFFF'
+      };
+
+      function obfuscateText(text){
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        return text.split('').map(c => chars[Math.floor(Math.random()*chars.length)]).join('');
       }
-      return out;
+
+      return lines.map(line => {
+        let result = '';
+        let color='#FFFFFF', bold=false, italic=false, underline=false, strikethrough=false, obfuscated=false;
+        const parts = line.split(/(§#(?:[0-9A-Fa-f]{6})|§[0-9a-frklmn])/gi);
+
+        parts.forEach(part=>{
+          if(!part) return;
+          const hexMatch = part.match(/§#([0-9A-Fa-f]{6})/);
+          const codeMatch = part.match(/§([0-9a-frklmn])/i);
+
+          if(hexMatch) {
+            color = `#${hexMatch[1]}`;
+          } else if(codeMatch) {
+            const code=codeMatch[1].toLowerCase();
+            if('0123456789abcdef'.includes(code)) color=colorMap[code];
+            else if(code==='l') bold=true;
+            else if(code==='o') italic=true;
+            else if(code==='n') underline=true;
+            else if(code==='m') strikethrough=true;
+            else if(code==='k') obfuscated=true;
+            else if(code==='r') color='#FFFFFF', bold=italic=underline=strikethrough=obfuscated=false;
+          } else {
+            let text=obfuscated?obfuscateText(part):part;
+            let style=`color:${color};`;
+            if(bold) style+='font-weight:bold;';
+            if(italic) style+='font-style:italic;';
+            if(underline && strikethrough) style+='text-decoration:underline line-through;';
+            else if(underline) style+='text-decoration:underline;';
+            else if(strikethrough) style+='text-decoration:line-through;';
+            result+=`<span style="${style}">${text}</span>`;
+          }
+        });
+        return result;
+      }).join('<br>');
     }
 
     async function checkStatus(){
       const host = serverInput.value.trim();
-      const port = portInput.value.trim() || '';
-      if (!host) return;
-      const query = port ? `${host}:${port}` : host;
-      const url = `https://api.mcsrvstat.us/3/${encodeURIComponent(query)}`;
+      const port = portInput.value.trim();
+      if(!host) return alert('Enter server IP/domain.');
 
-      checkBtn.disabled=true; checkBtn.textContent='Checking...';
-      try {
-        const res = await fetch(url, { cache: 'no-store' });
+      loading.classList.remove('hidden');
+      result.classList.add('hidden');
+      suggestionsContainer.classList.add('hidden');
+
+      try{
+        const res = await fetch(`https://api.mcsrvstat.us/2/${host}${port?`:${port}`:''}`);
         const data = await res.json();
-        renderData(host, port, data);
+
+        ui.icon.src = data.icon || 'https://www.pngall.com/wp-content/uploads/2017/05/Minecraft-PNG-Pic.png';
+        ui.serverName.textContent = data.hostname || host;
+        ui.onlineBadge.textContent = data.online ? 'Online' : 'Offline';
+        ui.onlineBadge.className = `badge ${data.online ? 'bg-green-600/80':'bg-red-600/80'} border border-white/10`;
+        ui.edition.textContent = data.software || 'Java';
+        ui.ipText.textContent = host;
+        ui.versionText.textContent = data.version || '—';
+        ui.protocolText.textContent = data.protocol || '—';
+        ui.playerCount.textContent = data.players?.online + '/' + data.players?.max || '0/0';
+        ui.playerBar.style.width = data.players?.max ? (data.players.online/data.players.max*100)+'%' : '0%';
+        ui.motd.innerHTML = renderMotd(data.motd?.raw || []);
+        ui.ping.textContent = data.debug?.ping ?? '—';
+        ui.software.textContent = data.software || '—';
+        ui.eula.textContent = data.eula===true?'Yes':(data.eula===false?'No':'—');
+        ui.checkedAt.textContent = fmtDate(new Date());
+        ui.resolved.textContent = data.ip || '—';
+        ui.portOut.textContent = data.port || port || '—';
+        ui.srv.textContent = data.srv?.host || '—';
+        ui.playersList.textContent = (data.players?.list || []).join(', ') || '—';
+
+        // Suggestions
+        suggestionList.innerHTML = '';
+        const suggestions = [];
+        if(!data.online) suggestions.push('Server is offline, check host/port.');
+        if(data.players?.online && data.players.max && (data.players.online/data.players.max) < 0.2) suggestions.push('Server has low player count, may be dead.');
+        if(data.version && !data.software) suggestions.push('Consider specifying server software for compatibility.');
+        if(data.eula===false) suggestions.push('Server EULA not accepted.');
+        if(suggestions.length>0) {
+          suggestions.forEach(s=>{ const li = document.createElement('li'); li.textContent=s; suggestionList.appendChild(li); });
+          suggestionsContainer.classList.remove('hidden');
+        } else { suggestionsContainer.classList.add('hidden'); }
+
+        loading.classList.add('hidden');
         result.classList.remove('hidden');
       } catch(e){
-        console.error(e);
-        showError(host, port);
-        result.classList.remove('hidden');
-      } finally { checkBtn.disabled=false; checkBtn.textContent='Check Status'; }
-    }
-
-    function showError(host, port){
-      ui.icon.src='';
-      ui.serverName.textContent=host;
-      ui.onlineBadge.textContent='Offline';
-      ui.onlineBadge.className='badge bg-red-600/80 border border-white/10';
-      ui.edition.textContent='Java';
-      ui.ipText.textContent=`${host}${port?':' + port:''}`;
-      ui.versionText.textContent='—';
-      ui.playerCount.textContent='0/0';
-      ui.playerBar.style.width='0%';
-      ui.motd.innerHTML='';
-      ui.ping.textContent='—';
-      ui.software.textContent='—';
-      ui.eula.textContent='—';
-      ui.checkedAt.textContent=fmtDate(new Date());
-      ui.resolved.textContent='—';
-      ui.portOut.textContent=port || '25565';
-      ui.srv.textContent='—';
-      ui.playersList.textContent='—';
-    }
-
-    function renderData(host, port, d){
-      const online=!!d?.online;
-      const ip=d?.ip||host;
-      const portOut=d?.port||port||25565;
-      const version=d?.version||'—';
-      const playersNow=d?.players?.online||0;
-      const playersMax=d?.players?.max||0;
-      const playerPct=playersMax?Math.min(100,Math.round((playersNow/playersMax)*100)):0;
-      const motdHtml=renderMotd(d?.motd?.raw||[]);
-      const pingValue=d?.debug?.ping?`${d.debug.ping} ms`:'—';
-      const srv=d?.srv_record?.target?`${d.srv_record.target}:${d.srv_record.port}`:(d?.hostname||'—');
-      const icon=d?.icon?`data:image/png;base64,${d.icon.replace(/^data:image\/png;base64,/,'')}`:'https://raw.githubusercontent.com/ikerstream/mc-icons/main/grass.png';
-      const playersList=Array.isArray(d?.players?.list)&&d.players.list.length?d.players.list.join(', '):'—';
-
-      ui.icon.src=icon;
-      ui.serverName.textContent=host;
-      ui.onlineBadge.textContent=online?'Online':'Offline';
-      ui.onlineBadge.className=online?'badge bg-emerald-600/80 border border-white/10':'badge bg-red-600/80 border border-white/10';
-      ui.edition.textContent='Java';
-      ui.ipText.textContent=`${ip}:${portOut}`;
-      ui.versionText.textContent=version;
-      ui.playerCount.textContent=`${playersNow}/${playersMax}`;
-      ui.playerBar.style.width=playerPct+'%';
-      ui.motd.innerHTML=motdHtml;
-      ui.ping.textContent=pingValue;
-      ui.software.textContent=version;
-      ui.eula.textContent=d?.eula_blocked===true?'Blocked':(d?.eula_blocked===false?'OK':'—');
-      ui.checkedAt.textContent=fmtDate(new Date());
-      ui.resolved.textContent=ip;
-      ui.portOut.textContent=portOut;
-      ui.srv.textContent=srv;
-      ui.playersList.textContent=playersList;
+        alert('Failed to fetch server status.');
+        loading.classList.add('hidden');
+      }
     }
   </script>
 </body>
