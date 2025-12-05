@@ -4,6 +4,6 @@ A modern, responsive Minecraft server status checker built with **HTML**, **Tail
 
 # Demo
 [prettychecker.netlify.app
-](https://prettychecker.netlify.app/)
+minecraftstatus.netlify.app
 
 
